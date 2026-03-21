@@ -167,7 +167,7 @@ Rules:
 - Always respond in SAME LANGUAGE as user query
 - If user query is Hinglish/Hindi → respond in Hinglish
 - Never switch language
-- Keep it simple and natural
+- Keep it simple and natural but detailed explaination 
             """
             },
             {"role": "user", "content": query}
@@ -195,7 +195,7 @@ def llm_with_data(query, data, ticker, data_context):
 - Always respond in SAME LANGUAGE as user query
 - If user query is Hinglish/Hindi → respond in Hinglish
 - Never switch language
-- Keep it simple and natural
+- Keep it simple and natural but detailed explaination 
 """
     prompt = f"""
 User query: {query}
