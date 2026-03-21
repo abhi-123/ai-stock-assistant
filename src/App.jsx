@@ -89,7 +89,7 @@ function App() {
     ))}
   </ul>
 
-  { data.insights.length > 0 && <h3 className="mt-3 font-semibold">💡 Insights</h3>}
+  { data.insights?.length > 0 && <h3 className="mt-3 font-semibold">💡 Insights</h3>}
   <ul>
     {(data.insights || []).map((i, idx) => (
       <li key={idx}>• {i}</li>

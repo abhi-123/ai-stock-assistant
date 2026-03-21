@@ -44,7 +44,12 @@ Return ONLY JSON:
   "confidence": ""
 }
 
-Intent can be: price, trend, analysis
+intent can be:
+- price
+- trend
+- analysis
+- prediction
+- recommendation 
 """
             },
             {
@@ -100,6 +105,7 @@ Rules:
   - current price
   - recent trend
   - future prediction (next 3 months, next year, target)
+  - recommendation (suggest stocks, best stocks, top stocks)
   
 - false → only if purely general knowledge
 - intent can be: price, trend, analysis
@@ -261,9 +267,6 @@ def smart_agent(query):
         # 👉 If not news → fetch stock data
         if decision.get("type") != "news":
             stock = decision.get("stock_name")
-
-            if not stock:
-                return {"error": "Stock not identified"}
 
             ticker = stock
             intents = decision.get("intent", [])
