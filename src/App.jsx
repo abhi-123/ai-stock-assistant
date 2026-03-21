@@ -14,7 +14,7 @@ function App() {
     setData(null);
     console.log(input)
     try {
-      const res = await fetch("https://ai-stock-assistant-c6el.onrender.com", { // https://ai-stock-assistant-c6el.onrender.com //http://localhost:8001/summarize
+      const res = await fetch("https://ai-stock-assistant-c6el.onrender.com/summarize", { // https://ai-stock-assistant-c6el.onrender.com/summarize //http://localhost:8001/summarize
         method: "POST",
         headers: {
           "Content-Type": "application/json",
