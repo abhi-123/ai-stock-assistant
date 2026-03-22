@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import json
 import yfinance as yf
 import requests
+import re
 # 🔑 Load env variables
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -174,6 +175,8 @@ Rules:
 - If user query is Hinglish/Hindi → respond in Hinglish
 - Never switch language
 - Keep it simple and natural but detailed explaination 
+- If exact data is not present, DO NOT guess numbers.
+Return "data not available".
             """
             },
             {"role": "user", "content": query}
@@ -187,8 +190,12 @@ Rules:
 # -------------------------
 # 🤖 4. LLM WITH DATA
 # -------------------------
-def llm_with_data(query, data, ticker, data_context):
-    print(query,ticker,data_context)
+def llm_with_data(query, data, ticker, data_context={}):
+    print(query,ticker,data_context,data)
+    if data_context.get('trend'):
+        trend = data_context.get('trend')
+    if data_context.get('price'):
+        price = data_context.get('price')
     system_prompt_llm = """
       Return ONLY JSON:
 
@@ -202,16 +209,27 @@ def llm_with_data(query, data, ticker, data_context):
 - If user query is Hinglish/Hindi → respond in Hinglish
 - Never switch language
 - Keep it simple and natural but detailed explaination 
+- If exact data is not present, DO NOT guess numbers.
+Return "data not available".
+- If query contains anything related to futures and options of any markets
+then return F&O (Futures & Options) queries jaise ATM price, expiry ya option chain ke liye exact real-time data yahan reliably fetch nahi ho pa raha hai.
+Lekin main aapko concept ya strategy samjha sakta hoon agar aap chahein.
 """
     prompt = f"""
 User query: {query}
 
 Stock: {ticker}
-Structured Data: {data_context}
+"""
 
+    if(data): 
+     system_prompt_llm += """
 Latest Info:
 {data}
 """
+    elif trend:
+     system_prompt_llm +=  f"""History: {trend}"""
+
+   
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -264,30 +282,138 @@ def smart_agent(query):
         ticker = None
         data_context = {}
 
+
+        keywords = ["last", "days", "percent", "gira", "increase"]
+
+        query_lower = query.lower()
+
         # 👉 If not news → fetch stock data
         if decision.get("type") != "news":
+            data = None
+            print('in general 1')
             stock = decision.get("stock_name")
-
+            print('in general 2')
+            
             ticker = stock
             intents = decision.get("intent", [])
-
+            print('in general 3')
             if "price" in intents:
                 data_context["price"] = get_price(ticker)
-
-            if "trend" in intents:
-                data_context["trend"] = get_trend(ticker)
-
-        print("🔎 Searching web...")
-        search_query = decision.get("query") or query
-        print(decision)
-        data = search_web(search_query)
-        print(data)
+            print('in general 4')
+                 # ✅ historical calc
+            if any(word in query_lower for word in keywords) or "trend" in intents:
+               days = extract_days(query)
+               data_context["trend"] = calculate_from_yahoo(ticker,days)
+               print(data_context)
+        else:
+            print("🔎 Searching web...")
+            search_query = decision.get("query") or query
+            print(decision)
+            data = search_web(search_query)
+            print(data)
         print("🤖 Generating final answer...")
-
+        print(query,data,ticker,data_context)
         return llm_with_data(query, data, ticker, data_context)
 
     except Exception as e:
         return {"error": str(e)}
+
+def calculate_from_yahoo(stock_name, days=10):
+    print(stock_name,days)
+    print('yahooooooooooo')
+    try:
+        # 🧠 Mapping (important)
+        STOCK_MAP = {
+        "infosys": "INFY.NS",
+        "infy": "INFY.NS",
+        "tcs": "TCS.NS",
+        "reliance": "RELIANCE.NS",
+        "hdfc bank": "HDFCBANK.NS",
+        "icici bank": "ICICIBANK.NS",
+        "sbi": "SBIN.NS",
+        "wipro": "WIPRO.NS",
+        "adani enterprises": "ADANIENT.NS",
+        "adani ports": "ADANIPORTS.NS",
+        "lt": "LT.NS",
+        "larsen": "LT.NS",
+        "asian paints": "ASIANPAINT.NS",
+        "bajaj finance": "BAJFINANCE.NS",
+        "kotak bank": "KOTAKBANK.NS"
+        }
+
+        ticker = STOCK_MAP.get(stock_name.lower()) 
+        print(ticker)
+        print('yahooooooooo')
+        if not ticker:
+         ticker = stock_name.upper() + ".NS"
+
+        # 📊 Fetch historical data
+        stock = yf.Ticker(ticker)
+        data = stock.history(period=f"{days}d")
+        print(data)
+        if data.empty or len(data) < 2:
+            return {"error": "Not enough data"}
+
+        # 📈 Calculate % change
+        start_price = data["Close"].iloc[0]
+        end_price = data["Close"].iloc[-1]
+
+        percent_change = ((end_price - start_price) / start_price) * 100
+
+        return {
+            "stock": stock_name,
+            "days": days,
+            "start_price": round(start_price, 2),
+            "end_price": round(end_price, 2),
+            "percent_change": round(percent_change, 2)
+        }
+
+    except Exception as e:
+        return {"error": str(e)}
+
+def extract_days(query):
+                
+                query = query.lower()
+
+                # 🟢 numbers based (days/din)
+                match = re.search(r'(\d+)\s*(day|days|din)', query)
+                if match:
+                    return int(match.group(1))
+
+                # 🟢 weeks / hafta
+                match = re.search(r'(\d+)\s*(week|weeks|hafta|hafte)', query)
+                if match:
+                    return int(match.group(1)) * 5   # approx trading days
+
+                # 🟢 months / mahina
+                match = re.search(r'(\d+)\s*(month|months|mahina|mahine)', query)
+                if match:
+                    return int(match.group(1)) * 22  # approx trading days
+
+                # 🟢 years / saal
+                match = re.search(r'(\d+)\s*(year|years|saal)', query)
+                if match:
+                    return int(match.group(1)) * 252  # approx trading days
+
+                # 🟢 keywords (no number)
+
+                if "today" in query or "aaj" in query:
+                    return 1
+
+                if "yesterday" in query or "kal" in query:
+                    return 1
+
+                if "week" in query or "hafta" in query:
+                    return 5
+
+                if "month" in query or "mahina" in query:
+                    return 22
+
+                if "year" in query or "saal" in query:
+                    return 252
+
+                # 🟢 fallback
+                return 10
 
 
  
