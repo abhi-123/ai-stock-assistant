@@ -61,8 +61,9 @@ function App() {
 
       {/* Loader */}
       {loading && (
-        <div className="text-center mt-6 text-gray-600">
-          ⏳ Analyzing and summarizing your content...
+          <div className="flex flex-col items-center mt-6">
+          <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-2 text-gray-600">Analyzing & Summarizing...</p>
         </div>
       )}
 
@@ -89,7 +90,7 @@ function App() {
     ))}
   </ul>
 
-  { data.insights?.length > 0 && <h3 className="mt-3 font-semibold">💡 Insights</h3>}
+  { data.insights.length > 0 && <h3 className="mt-3 font-semibold">💡 Insights</h3>}
   <ul>
     {(data.insights || []).map((i, idx) => (
       <li key={idx}>• {i}</li>
